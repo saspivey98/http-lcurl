@@ -1,0 +1,327 @@
+local lib = {}
+
+function lib:INFO(_)
+end
+
+local JSON = require('rapidjson')
+local LCURL = require('lcurl')
+local MIME = require('MIME')
+
+local DEFAULT_HEADERS = {
+    ["Content-Type"] = "application/json",
+    ["Accept"] = "application/json",
+    ["User-Agent"] = "Lua-cURLv3",
+}
+
+--enumerator of applicable methods
+local METHOD = {
+    GET = "GET",
+    POST = "POST",
+    PUT = "PUT",
+    PATCH = "PATCH",
+    DELETE = "DELETE",
+    HEAD = "HEAD",
+    OPTIONS = "OPTIONS"
+}
+
+local CONTENT_TYPE = {
+    JSON = "application/json",
+    FORM = "application/x-www-form-urlencoded",
+    MULTIPART = "multipart/form-data",
+    TEXT = "text/plain",
+    XML = "application/xml"
+}
+
+--convert username to Basic Auth Token
+local function basicAuth(headers)
+    headers.Authorization = 'Basic '..MIME.b64(headers.username..':'..headers.password)
+    headers.username = nil
+    headers.password = nil
+end
+
+--encode form data for sending files
+local function encodeFormData(data)
+    local parts = {}
+    for k, v in pairs(data) do
+        table.insert(parts, MIME.encode("url", tostring(k)) .. "=" .. MIME.encode("url", tostring(v)))
+    end
+    return table.concat(parts, "&")
+end
+
+-- Helper function to create multipart form data
+local function createMultipartForm(data, files)
+    local boundary = "----LuaCURLBoundary" .. tostring(os.time())
+    local parts = {}
+
+    -- Add regular form fields
+    if data then
+        for k, v in pairs(data) do
+            table.insert(parts, "--" .. boundary)
+            table.insert(parts, 'Content-Disposition: form-data; name="' .. k .. '"')
+            table.insert(parts, "")
+            table.insert(parts, tostring(v))
+        end
+    end
+
+    -- Add file fields
+    if files then
+        for field_name, file_info in pairs(files) do
+            table.insert(parts, "--" .. boundary)
+            local filename = file_info.filename or "file"
+            local content_type = file_info.content_type or "application/octet-stream"
+
+            table.insert(parts, string.format('Content-Disposition: form-data; name="%s"; filename="%s"', 
+                field_name, filename))
+            table.insert(parts, "Content-Type: " .. content_type)
+            table.insert(parts, "")
+
+            -- Read file content
+            local content
+            if file_info.content then
+                content = file_info.content
+            elseif file_info.filepath then
+                local file = io.open(file_info.filepath, "rb")
+                if not file then
+                    error("Could not open file: " .. file_info.filepath)
+                end
+                content = file:read("*all")
+                file:close()
+            else
+                error("File must have either 'content' or 'filepath'")
+            end
+
+            table.insert(parts, content)
+        end
+    end
+
+    table.insert(parts, "--" .. boundary .. "--")
+    table.insert(parts, "")
+
+    return table.concat(parts, "\r\n"), boundary
+end
+
+--do bounds checks of input arguments
+local function parseArguments(t)
+    if type(t) ~= "table" then
+        error("insufficient arguments")
+    end
+    local ret = {}
+
+    --assert url
+    assert(t.url, "URL was not provided.")
+    assert(type(t.url) == "string", "URL must be of type string.")
+    assert(t.url ~= "", "URL can not be blank.")
+    ret.url = t.url
+
+    --check optionals: headers, body, options
+    local optionals = {"headers", "body", "options"}
+    for _,option in ipairs(optionals) do
+        if (t[option] ~= nil) then
+            assert(type(t[option]) == "table")
+        end
+        ret[option] = t[option] or {}
+    end
+
+    return ret
+end
+
+--main function
+local function request(method, t)
+    --sanitize inputs
+    local args = parseArguments(t)
+    local url = args.url
+    local request_headers = args["headers"]
+    local body = args["body"]
+    local options = args["options"]
+
+    --merge headers with defaults
+    for k,v in pairs(DEFAULT_HEADERS) do
+        if request_headers[k] == nil then
+            request_headers[k] = v
+        end
+    end
+
+    --if username and password, make Basic Auth
+    if (request_headers["username"] and request_headers["password"] and options.ignoreBasicAuth == nil) then
+        basicAuth(request_headers)
+    end
+
+    local request_body
+    local result_body = {}
+    local result_headers = {}
+
+    --body has data, encode as JSON
+    if options.files then
+        local form_data, boundary = createMultipartForm(body, options.files)
+        request_body = form_data
+        request_headers["Content-Type"] = CONTENT_TYPE.FORM
+    elseif request_headers["CONTENT_TYPE"] == CONTENT_TYPE.FORM then
+        if next(body) ~= nil then
+            request_body = encodeFormData(body)
+        end
+    elseif request_headers["CONTENT_TYPE"] == CONTENT_TYPE.JSON then
+        if next(body) ~= nil then
+            request_body = JSON.encode(body)
+        else
+            request_body = ""
+        end
+    elseif type(body) == "string" then
+        request_body = body
+    else
+        if next(body) ~= nil then
+            request_body = JSON.encode(body)
+        else
+            error("Failed to make request body.")
+        end
+    end
+
+    --[[
+        ssl_verifypeer refers to if the host has a valid CA SSL cert
+    --]]
+    local INIT = {
+        url = url,
+        ssl_verifypeer = options.ssl_verifypeer or false,
+        verbose = options.verbose or 0,
+        timeout = options.timeout or 30,
+        followlocation = options.followlocation or true,
+        maxredirs = options.maxredirs or 5,
+        writefunction = function(data)
+            if data and type(data) == "string" then
+                table.insert(result_body, data)
+            end
+        end,
+        headerfunction = function(header_line)
+            if not header_line or type(header_line) ~= "string" then
+                return
+            end
+
+            --remove whitespaces
+            local clean_header = header_line:gsub("%s+$", "")
+
+            if clean_header ~= "" then
+                --parse headers
+                local header_k, header_v = clean_header:match("^([^:]+):%s*(.*)$")
+                if header_k and header_v then
+                    -- Normalize header names to lowercase for consistency
+                    header_k = header_k:lower():gsub("^%s+", ""):gsub("%s+$", "")
+                    header_v = header_v:gsub("^%s+", ""):gsub("%s+$", "")
+
+                    if header_k ~= "" then
+                        -- Handle multiple headers with same name (like Set-Cookie)
+                        if result_headers[header_k] then
+                            if type(result_headers[header_k]) == "table" then
+                                table.insert(result_headers[header_k], header_v)
+                            else
+                                result_headers[header_k] = {result_headers[header_k], header_v}
+                            end
+                        else
+                            result_headers[header_k] = header_v
+                        end
+                    end
+                end
+            end
+        end
+    }
+    --Check for TLS
+    if url:match("^https://") then
+        INIT.ssl_verifyhost = options.ssl_verifyhost or 2 -- Verify hostname matches cert
+        INIT.sslversion = options.sslversion or LCURL.SSLVERSION_TLSv1_2 -- Use modern TLS
+        if options.cainfo then
+            INIT.cainfo = options.cainfo -- Custom CA bundle path
+        end
+    end
+
+    --init curl request
+    local easy = LCURL.easy(INIT)
+    if not easy then error("Failed to initialize cURL: "..tostring(error)) end
+
+    --set request type
+    easy:setopt_customrequest(method)
+
+    --[[
+    proxy options:
+    -> proxy is the url of the proxy
+    -> setopt_proxyuserpwd sets the header [Proxy-Authorization]: Basic base64
+    -> proxyCred and either be "username:password" or {username="",password=""}
+    --]]
+    if options["proxy"] then --url of proxy
+        easy:setopt_proxy(options.proxy)
+        if options.proxyCred then
+            if type(options.proxyCred) == "string" then
+                easy:setopt_proxyuserpwd(options.proxyCred)
+            elseif type(options.proxyCred) == "table" then
+                easy:setopt_proxyuserpwd(options.proxyCred.username..":"..options.proxyCred.password)
+            else
+                error("not acceptable proxy options")
+            end
+        end
+    end
+
+    --handle post body
+    local body_length = string.len(request_body)
+    if (method ~= METHOD.GET and body_length > 0) then
+        easy:setopt_postfields(request_body)
+        request_headers["Content-Length"] = body_length
+    end
+
+    --cast headers as string
+    local httpheader = {}
+    for k,v in pairs(request_headers) do
+        table.insert(httpheader, string.format("%s: %s", k, v))
+    end
+    easy:setopt_httpheader(httpheader)
+
+    --make the request
+    local ok, err = easy:perform()
+    if not(ok) then
+        return "Error: "..err
+    end
+    local code = easy:getinfo_response_code()
+    local effective_url = easy:getinfo_effective_url()
+    easy:close()
+
+    local data
+    if result_body ~= nil then
+        if type(result_body) == "table" then --usually returns array
+            data = table.concat(result_body) --take first element
+            if data ~= "" then
+                --if result_headers["Content-Encoding"] then end --check if there is encoding?
+                local content_type = result_headers["content-type"] or ""
+                if content_type:lower():find("application/json") then
+                    data = JSON.decode(data) or data
+                end
+            end
+        else
+            data = result_body
+        end
+    end
+
+    --wrap up finish
+    return {
+        code = code or 0,
+        success = code >= 200 and code < 300,
+        url = effective_url,
+        data = data,
+        headers = result_headers
+    }
+end
+
+function lib:GET(args)
+    local ok, res = pcall(request, METHOD.GET, args)
+    if not(ok) then return {success=false,"Error: "..res} end
+    return res
+end
+
+function lib:PUT(args)
+    local ok, res = pcall(request, METHOD.PUT, args)
+    if not(ok) then return {success=false,"Error: "..res} end
+    return res
+end
+
+function lib:POST(args)
+    local ok, res = pcall(request, METHOD.POST, args)
+    if not(ok) then return {success=false,"Error: "..res} end
+    return res
+end
+
+return lib
