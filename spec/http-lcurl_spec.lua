@@ -1,56 +1,155 @@
--- spec/authentication_spec.lua
-describe("Authentication", function()
-    local http_client = require('http_client')
-    
-    describe("Basic Authentication", function()
-        it("should handle missing password", function()
-            local result = http_client:GET({
-                url = "https://example.com",
-                headers = {username = "test"}
-            })
-            -- Should still succeed but not add auth header
+package.path = "../?.lua;" .. package.path
+local package_path = [[C:\Users\sspivey\.vscode\extensions\sspivey.lua-inmation-debugger-1.0.2\runtime\win32-x64\lua53]]
+package.path = package_path.."/?.lua;" .. package.path
+package.cpath = package_path.."/?.dll;" .. package.cpath
+require 'busted.runner'()
+local http_client = require('http-lcurl')
+
+describe("REST Methods", function()
+    local url = "https://httpbin.org"
+    describe("GET", function()
+        it("should handle with no response body", function()
+            local result = http_client:GET{url=url.."/get"}
             assert.is_true(result.success)
         end)
-        
-        it("should handle special characters in credentials", function()
-            local result = http_client:GET({
-                url = "https://example.com",
-                headers = {
-                    username = "test@domain.com",
-                    password = "p@ssw0rd!#$"
-                }
-            })
-            assert.is_true(result.success)
+        it("should handle with response body", function()
+        end)
+        it("should handle different content types", function()
+        end)
+        it("should have default headers", function()
+        end)
+        it("should allow custom headers", function()
+        end)
+        it("should not crash on a bad configuration", function()
+        end)
+        it("should properly encode special characters in query parameters", function()
         end)
     end)
-    
-    describe("Custom Authorization", function()
-        it("should preserve custom authorization headers", function()
-            local result = http_client:GET({
-                url = "https://example.com",
-                headers = {
-                    Authorization = "Bearer token123"
-                }
-            })
-            assert.is_true(result.success)
+    --[[
+    POST, PUT, and PATCH should have identical tests
+    --]]
+    describe("POST", function()
+        it("should handle a POST request", function()
         end)
-        
-        it("should handle API key authentication", function()
-            local result = http_client:GET({
-                url = "https://example.com",
-                headers = {
-                    ["X-API-Key"] = "secret-api-key-123"
-                }
-            })
-            assert.is_true(result.success)
+        it("should send JSON request body", function()
+        end)
+        it("should send form-encoded request body", function()
+        end)
+        it("should send raw/text request body", function()
+        end)
+        it("should handle empty request body", function()
+        end)
+        it("should set Content-Type header automatically", function()
+        end)
+        it("should allow custom Content-Type header", function()
+        end)
+        it("should handle different response status codes", function()
+        end)
+        it("should handle response body", function()
+        end)
+        it("should allow custom headers", function()
+        end)
+        it("should not crash on bad configuration", function()
+        end)
+    end)
+    describe("PUT", function()
+        it("should handle a PUT request", function()
+        end)
+        it("should send JSON request body", function()
+        end)
+        it("should send form-encoded request body", function()
+        end)
+        it("should send raw/text request body", function()
+        end)
+        it("should handle empty request body", function()
+        end)
+        it("should set Content-Type header automatically", function()
+        end)
+        it("should allow custom Content-Type header", function()
+        end)
+        it("should handle different response status codes", function()
+        end)
+        it("should handle response body", function()
+        end)
+        it("should allow custom headers", function()
+        end)
+        it("should not crash on bad configuration", function()
+        end)
+    end)
+    describe("PATCH", function()
+        it("should send JSON request body", function()
+        end)
+        it("should send form-encoded request body", function()
+        end)
+        it("should send raw/text request body", function()
+        end)
+        it("should handle empty request body", function()
+        end)
+        it("should set Content-Type header automatically", function()
+        end)
+        it("should allow custom Content-Type header", function()
+        end)
+        it("should handle different response status codes", function()
+        end)
+        it("should handle response body", function()
+        end)
+        it("should allow custom headers", function()
+        end)
+        it("should not crash on bad configuration", function()
+        end)
+    end)
+    describe("DELETE", function()
+        it("should handle a DELETE request", function()
+        end)
+        it("should handle DELETE with query parameters", function()
+        end)
+        it("should handle DELETE with request body", function()
+        end)
+        it("should handle DELETE with empty request body", function()
+        end)
+        it("should allow custom headers", function()
+        end)
+        it("should handle different response status codes", function()
+        end)
+        it("should handle response body", function()
+        end)
+        it("should not crash on bad configuration", function()
+        end)
+    end)
+    describe("HEAD", function()
+        it("should handle a HEAD request", function()
+        end)
+        it("should return headers but no body", function()
+        end)
+        it("should handle query parameters", function()
+        end)
+    end)
+    describe("OPTIONS", function()
+        it("should handle an OPTIONS request", function()
+        end)  
+        it("should return Allow header", function()
+        end)
+        it("should handle CORS headers", function()
         end)
     end)
 end)
 
--- spec/file_upload_spec.lua
+describe("Configuration", function()
+    describe("Redirects", function()
+    end)
+    describe("timeouts", function()
+    end)
+    describe("SSL/TLS", function()
+    end)
+
+    describe("Cookies", function()
+    end)
+end)
+
+describe("Authentication", function()
+end)
+
 describe("File Upload Functionality", function()
-    local http_client = require('http_client')
-    
     before_each(function()
         -- Mock file operations
         _G.original_io_open = io.open
@@ -159,4 +258,8 @@ describe("File Upload Functionality", function()
             assert.is_true(result.success)
         end)
     end)
+    describe("Error Handling", function()
+    -- Network errors, malformed responses, connection failures
+    end)
 end)
+

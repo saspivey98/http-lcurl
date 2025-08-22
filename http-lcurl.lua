@@ -146,32 +146,34 @@ local function request(method, t)
         basicAuth(request_headers)
     end
 
-    local request_body
+    local request_body = ""
     local result_body = {}
     local result_headers = {}
 
     --body has data, encode as JSON
-    if options.files then
-        local form_data, boundary = createMultipartForm(body, options.files)
-        request_body = form_data
-        request_headers["Content-Type"] = CONTENT_TYPE.FORM
-    elseif request_headers["CONTENT_TYPE"] == CONTENT_TYPE.FORM then
-        if next(body) ~= nil then
-            request_body = encodeFormData(body)
-        end
-    elseif request_headers["CONTENT_TYPE"] == CONTENT_TYPE.JSON then
-        if next(body) ~= nil then
-            request_body = JSON.encode(body)
+    if method ~= "GET" then
+        if options.files then
+            local form_data, boundary = createMultipartForm(body, options.files)
+            request_body = form_data
+            request_headers["Content-Type"] = CONTENT_TYPE.FORM
+        elseif request_headers["CONTENT_TYPE"] == CONTENT_TYPE.FORM then
+            if next(body) ~= nil then
+                request_body = encodeFormData(body)
+            end
+        elseif request_headers["CONTENT_TYPE"] == CONTENT_TYPE.JSON then
+            if next(body) ~= nil then
+                request_body = JSON.encode(body)
+            else
+                request_body = ""
+            end
+        elseif type(body) == "string" then
+            request_body = body
         else
-            request_body = ""
-        end
-    elseif type(body) == "string" then
-        request_body = body
-    else
-        if next(body) ~= nil then
-            request_body = JSON.encode(body)
-        else
-            error("Failed to make request body.")
+            if next(body) ~= nil then
+                request_body = JSON.encode(body)
+            else
+                error("Failed to make request body.")
+            end
         end
     end
 
@@ -225,7 +227,6 @@ local function request(method, t)
     --Check for TLS
     if url:match("^https://") then
         INIT.ssl_verifyhost = options.ssl_verifyhost or 2 -- Verify hostname matches cert
-        INIT.sslversion = options.sslversion or LCURL.SSLVERSION_TLSv1_2 -- Use modern TLS
         if options.cainfo then
             INIT.cainfo = options.cainfo -- Custom CA bundle path
         end
@@ -323,5 +324,30 @@ function lib:POST(args)
     if not(ok) then return {success=false,"Error: "..res} end
     return res
 end
+
+function lib:PATCH(args)
+    local ok, res = pcall(request, METHOD.PATCH, args)
+    if not(ok) then return {success=false,"Error: "..res} end
+    return res
+end
+
+function lib:DELETE(args)
+    local ok, res = pcall(request, METHOD.DELETE, args)
+    if not(ok) then return {success=false,"Error: "..res} end
+    return res
+end
+
+function lib:HEAD(args)
+    local ok, res = pcall(request, METHOD.HEAD, args)
+    if not(ok) then return {success=false,"Error: "..res} end
+    return res
+end
+
+function lib:OPTIONS(args)
+    local ok, res = pcall(request, METHOD.OPTIONS, args)
+    if not(ok) then return {success=false,"Error: "..res} end
+    return res
+end
+
 
 return lib

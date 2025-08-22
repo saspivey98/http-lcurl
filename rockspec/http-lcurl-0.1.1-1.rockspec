@@ -12,9 +12,9 @@ description = {
 }
 dependencies = {
     "lua >= 5.3",
-    "mimetypes >= 1.0.0",
     "lua-curl >= 0.3.13",
     "rapidjson >= 0.7.1",
+    "luasocket >= 3.1.0" --needed for MIME
 }
 build = {
     type="builtin",
