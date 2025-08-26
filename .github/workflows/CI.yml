@@ -1,0 +1,64 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      httpbin:
+        image: kennethreitz/httpbin
+        ports:
+          - 8080:80
+        options: >-
+          --health-cmd "curl -f http://localhost/status || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Lua
+      uses: leafo/gh-actions-lua@v10
+      with:
+        luaVersion: "5.3"
+
+    - name: Setup LuaRocks
+      uses: leafo/gh-actions-luarocks@v4
+
+    - name: Install Busted
+      run: |
+        luarocks install busted
+
+    - name: Install additional dependencies
+      run: |
+        # Install dependencies
+        luarocks install lua-cURL || true
+        luarocks install rapidjson || true
+        luarocks install luaexpat || true
+
+    - name: Wait for httpbin service
+      run: |
+        timeout 60s bash -c 'until curl -f http://localhost:8080/status; do sleep 2; done'
+
+    - name: Run unit tests
+      run: |
+        busted --verbose --output=gtest
+      env:
+        HTTPBIN_URL: http://localhost:8080
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: |
+          *.xml
+          *.log

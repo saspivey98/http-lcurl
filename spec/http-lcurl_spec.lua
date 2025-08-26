@@ -5,24 +5,60 @@ package.cpath = package_path.."/?.dll;" .. package.cpath
 require 'busted.runner'()
 local http_client = require('http-lcurl')
 
+local url = "https://httpbin.org"
 describe("REST Methods", function()
-    local url = "https://httpbin.org"
-    describe("GET", function()
+    describe("GET #GET", function()
         it("should handle with no response body", function()
-            local result = http_client:GET{url=url.."/get"}
-            assert.is_true(result.success)
+            local res = http_client:GET{url=url.."/status/200", headers={Accept="text/plain"}}
+            assert.is_true(res.success)
+            assert.is_equal(res.data, "")
         end)
         it("should handle with response body", function()
+            local res = http_client:GET{url=url.."/get"}
+            assert.is_true(res.success)
+            assert.is_not_nil(res.data)
         end)
         it("should handle different content types", function()
+            local res1 = http_client:GET{url=url.."/encoding/utf8", headers={Accept="text/html"}}
+            assert.is_string(res1.data)
+            local res2 = http_client:GET{url=url.."/json", headers={Accept="application/json"}}
+            assert.is_table(res2.data)
+            local res3 = http_client:GET{url=url.."/robots.txt", headers={Accept="text/plain"}}
+            assert.is_string(res3.data)
+            --TODO ADD XML PARSING TO TABLE
+            local res4 = http_client:GET{url=url.."/xml", headers={Accept="application/xml"}}
+            assert.is_string(res4.data)
         end)
         it("should have default headers", function()
+            local res = http_client:GET{url=url.."/headers"}
+            assert.is_equal(res.data.headers["Accept"], "application/json")
+            assert.is_equal(res.data.headers["User-Agent"], "Lua-cURLv3")
+            assert.is_equal(res.data.headers["Content-Type"], "application/json")
         end)
         it("should allow custom headers", function()
+            local res = http_client:GET{url=url.."/headers", headers={Test="UnitTest"}}
+            assert.is_equal(res.data.headers["Test"], "UnitTest")
         end)
         it("should not crash on a bad configuration", function()
+            --no url
+            local res1 = http_client:GET{}
+            assert.is_false(res1.success)
+            --blank url
+            local res2 = http_client:GET{url=""}
+            assert.is_false(res2.success)
+            --assert types
+            local res3 = http_client:GET{url={url=url}}
+            assert.is_false(res3.success)
+            local res4 = http_client:GET{url=url,headers=""}
+            assert.is_false(res4.success)
         end)
         it("should properly encode special characters in query parameters", function()
+            local v1 = "café"
+            local res1 = http_client:GET{url=url.."/get?value="..v1}
+            assert.is_equal(res1.data.args.value, v1)
+            local v2 = "测试"
+            local res2 = http_client:GET{url=url.."/get?value="..v2}
+            assert.is_equal(res2.data.args.value, v2)
         end)
     end)
     --[[
@@ -30,8 +66,13 @@ describe("REST Methods", function()
     --]]
     describe("POST", function()
         it("should handle a POST request", function()
+            local res = http_client:POST{url=url.."/post"}
+            assert.is_true(res.success)
         end)
         it("should send JSON request body", function()
+            local res = http_client:POST{url=url.."/post", body={"test"}}
+            assert.is_true(res.success)
+            assert.is_equal(res.data.json[1], "test")
         end)
         it("should send form-encoded request body", function()
         end)

@@ -5,7 +5,7 @@ end
 
 local JSON = require('rapidjson')
 local LCURL = require('lcurl')
-local MIME = require('MIME')
+local XML = require('lxp.totable')
 
 local DEFAULT_HEADERS = {
     ["Content-Type"] = "application/json",
@@ -32,18 +32,12 @@ local CONTENT_TYPE = {
     XML = "application/xml"
 }
 
---convert username to Basic Auth Token
-local function basicAuth(headers)
-    headers.Authorization = 'Basic '..MIME.b64(headers.username..':'..headers.password)
-    headers.username = nil
-    headers.password = nil
-end
-
 --encode form data for sending files
 local function encodeFormData(data)
     local parts = {}
     for k, v in pairs(data) do
-        table.insert(parts, MIME.encode("url", tostring(k)) .. "=" .. MIME.encode("url", tostring(v)))
+        --table.insert(parts, MIME.encode("url", tostring(k)) .. "=" .. MIME.encode("url", tostring(v)))
+        --TODO
     end
     return table.concat(parts, "&")
 end
@@ -141,11 +135,6 @@ local function request(method, t)
         end
     end
 
-    --if username and password, make Basic Auth
-    if (request_headers["username"] and request_headers["password"] and options.ignoreBasicAuth == nil) then
-        basicAuth(request_headers)
-    end
-
     local request_body = ""
     local result_body = {}
     local result_headers = {}
@@ -156,11 +145,11 @@ local function request(method, t)
             local form_data, boundary = createMultipartForm(body, options.files)
             request_body = form_data
             request_headers["Content-Type"] = CONTENT_TYPE.FORM
-        elseif request_headers["CONTENT_TYPE"] == CONTENT_TYPE.FORM then
+        elseif request_headers["Content-Type"] == CONTENT_TYPE.FORM then
             if next(body) ~= nil then
                 request_body = encodeFormData(body)
             end
-        elseif request_headers["CONTENT_TYPE"] == CONTENT_TYPE.JSON then
+        elseif request_headers["Content-Type"] == CONTENT_TYPE.JSON then
             if next(body) ~= nil then
                 request_body = JSON.encode(body)
             else
@@ -236,6 +225,13 @@ local function request(method, t)
     local easy = LCURL.easy(INIT)
     if not easy then error("Failed to initialize cURL: "..tostring(error)) end
 
+    --if username and password, make Basic Auth
+    if (request_headers["username"] and request_headers["password"] and options.ignoreBasicAuth == nil) then
+        easy:setopt_userpwd(request_headers["username"]..":"..request_headers["password"])
+        request_headers["username"] = nil
+        request_headers["password"] = nil
+    end
+
     --set request type
     easy:setopt_customrequest(method)
 
@@ -290,7 +286,11 @@ local function request(method, t)
                 local content_type = result_headers["content-type"] or ""
                 if content_type:lower():find("application/json") then
                     data = JSON.decode(data) or data
+                elseif content_type:lower():find("application/xml") then
+                    data = XML.torecord(XML.clean(XML.parse(data))) or data
                 end
+            else
+                --no data
             end
         else
             data = result_body
