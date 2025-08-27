@@ -20,6 +20,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libcurl4-openssl-dev libexpat1-dev
+
     - name: Setup Lua
       uses: leafo/gh-actions-lua@v10
       with:
