@@ -23,7 +23,7 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libcurl4-openssl-dev libexpat1-dev
+        sudo apt-get install -y curl libcurl4-openssl-dev libexpat1-dev build-essential pkg-config
 
     - name: Setup Lua
       uses: leafo/gh-actions-lua@v10
@@ -36,7 +36,7 @@ jobs:
     - name: Install Busted and dependencies
       run: |
         luarocks install busted
-        luarocks install lua-cURL
+        luarocks install lua-cURL CURL_INCDIR=/usr/include/x86_64-linux-gnu
         luarocks install rapidjson
         luarocks install luaexpat
 
