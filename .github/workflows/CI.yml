@@ -42,7 +42,7 @@ jobs:
 
     - name: Wait for httpbin service
       run: |
-        timeout 60s bash -c 'until curl -f http://localhost:8080/status; do sleep 2; done'
+        timeout 60s bash -c 'until curl -f http://localhost:8080/status/200; do sleep 2; done'
 
     - name: Run unit tests
       run: |
