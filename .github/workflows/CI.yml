@@ -15,11 +15,6 @@ jobs:
         image: kennethreitz/httpbin
         ports:
           - 8080:80
-        options: >-
-          --health-cmd "curl -f http://localhost/status || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
     - name: Checkout code
@@ -33,16 +28,12 @@ jobs:
     - name: Setup LuaRocks
       uses: leafo/gh-actions-luarocks@v4
 
-    - name: Install Busted
+    - name: Install Busted and dependencies
       run: |
         luarocks install busted
-
-    - name: Install additional dependencies
-      run: |
-        # Install dependencies
-        luarocks install lua-cURL || true
-        luarocks install rapidjson || true
-        luarocks install luaexpat || true
+        luarocks install lua-cURL
+        luarocks install rapidjson
+        luarocks install luaexpat
 
     - name: Wait for httpbin service
       run: |

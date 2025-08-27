@@ -5,7 +5,7 @@ package.cpath = package_path.."/?.dll;" .. package.cpath
 require 'busted.runner'()
 local http_client = require('http-lcurl')
 
-local url = "https://httpbin.org"
+local url = "http://localhost:8080"
 describe("REST Methods", function()
     describe("GET #GET", function()
         it("should handle with no response body", function()
@@ -25,9 +25,8 @@ describe("REST Methods", function()
             assert.is_table(res2.data)
             local res3 = http_client:GET{url=url.."/robots.txt", headers={Accept="text/plain"}}
             assert.is_string(res3.data)
-            --TODO ADD XML PARSING TO TABLE
             local res4 = http_client:GET{url=url.."/xml", headers={Accept="application/xml"}}
-            assert.is_string(res4.data)
+            assert.is_table(res4.data)
         end)
         it("should have default headers", function()
             local res = http_client:GET{url=url.."/headers"}
@@ -64,7 +63,7 @@ describe("REST Methods", function()
     --[[
     POST, PUT, and PATCH should have identical tests
     --]]
-    describe("POST", function()
+    describe("POST #POST", function()
         it("should handle a POST request", function()
             local res = http_client:POST{url=url.."/post"}
             assert.is_true(res.success)
@@ -75,46 +74,137 @@ describe("REST Methods", function()
             assert.is_equal(res.data.json[1], "test")
         end)
         it("should send form-encoded request body", function()
+            local res1 = http_client:POST{
+                url=url.."/post",
+                headers={["Content-Type"] = "application/x-www-form-urlencoded"},
+                body="key1=value1&key2=value2"
+            }
+            assert.is_true(res1.success)
+            assert.is_equal(res1.data.form.key1, "value1")
+            assert.is_equal(res1.data.form.key2, "value2")
+            local res2 = http_client:POST{
+                url=url.."/post",
+                headers={["Content-Type"] = "application/x-www-form-urlencoded"},
+                body={ key1 = "value1", key2 = "value2" }
+            }
+            assert.is_true(res2.success)
+            assert.is_equal(res2.data.form.key1, "value1")
+            assert.is_equal(res2.data.form.key2, "value2")
         end)
         it("should send raw/text request body", function()
+            local res = http_client:POST{
+                url=url.."/post",
+                headers={["Content-Type"] = "text/plain"},
+                body="text"
+            }
+            assert.is_true(res.success)
+            assert.is_equal(res.data.data, "text")
         end)
         it("should handle empty request body", function()
+            local res = http_client:POST{url=url.."/post"}
+            assert.is_true(res.success)
         end)
         it("should set Content-Type header automatically", function()
-        end)
-        it("should allow custom Content-Type header", function()
+            local res = http_client:POST{ url=url.."/post", body={key="value"} }
+            assert.is_true(res.success)
+            assert.is_equal(res.data.json.key, "value")
         end)
         it("should handle different response status codes", function()
-        end)
-        it("should handle response body", function()
-        end)
-        it("should allow custom headers", function()
+            local codes = { 200, 400, 401, 403, 404, 500}
+            for _,code in ipairs(codes) do
+                local res = http_client:POST{url=url.."/status/"..code}
+                if code >= 200 and code <= 300 then
+                    assert.is_true(res.success)
+                else
+                    assert.is_false(res.success)
+                end
+                assert.is_equal(res.code, code)
+            end
         end)
         it("should not crash on bad configuration", function()
+            --no url
+            local res1 = http_client:POST{}
+            assert.is_false(res1.success)
+            --blank url
+            local res2 = http_client:POST{url=""}
+            assert.is_false(res2.success)
+            --assert types
+            local res3 = http_client:POST{url={url=url}}
+            assert.is_false(res3.success)
+            local res4 = http_client:POST{url=url,headers=""}
+            assert.is_false(res4.success)
         end)
     end)
-    describe("PUT", function()
-        it("should handle a PUT request", function()
+    describe("PUT #PUT", function()
+        it("should handle a POST request", function()
+            local res = http_client:PUT{url=url.."/put"}
+            assert.is_true(res.success)
         end)
         it("should send JSON request body", function()
+            local res = http_client:PUT{url=url.."/put", body={"test"}}
+            assert.is_true(res.success)
+            assert.is_equal(res.data.json[1], "test")
         end)
         it("should send form-encoded request body", function()
+            local res1 = http_client:PUT{
+                url=url.."/put",
+                headers={["Content-Type"] = "application/x-www-form-urlencoded"},
+                body="key1=value1&key2=value2"
+            }
+            assert.is_true(res1.success)
+            assert.is_equal(res1.data.form.key1, "value1")
+            assert.is_equal(res1.data.form.key2, "value2")
+            local res2 = http_client:PUT{
+                url=url.."/put",
+                headers={["Content-Type"] = "application/x-www-form-urlencoded"},
+                body={ key1 = "value1", key2 = "value2" }
+            }
+            assert.is_true(res2.success)
+            assert.is_equal(res2.data.form.key1, "value1")
+            assert.is_equal(res2.data.form.key2, "value2")
         end)
         it("should send raw/text request body", function()
+            local res = http_client:PUT{
+                url=url.."/put",
+                headers={["Content-Type"] = "text/plain"},
+                body="text"
+            }
+            assert.is_true(res.success)
+            assert.is_equal(res.data.data, "text")
         end)
         it("should handle empty request body", function()
+            local res = http_client:PUT{url=url.."/put"}
+            assert.is_true(res.success)
         end)
         it("should set Content-Type header automatically", function()
-        end)
-        it("should allow custom Content-Type header", function()
+            local res = http_client:PUT{ url=url.."/put", body={key="value"} }
+            assert.is_true(res.success)
+            assert.is_equal(res.data.json.key, "value")
         end)
         it("should handle different response status codes", function()
-        end)
-        it("should handle response body", function()
-        end)
-        it("should allow custom headers", function()
+            local codes = { 200, 400, 401, 403, 404, 500}
+            for _,code in ipairs(codes) do
+                local res = http_client:PUT{url=url.."/status/"..code}
+                if code >= 200 and code <= 300 then
+                    assert.is_true(res.success)
+                else
+                    assert.is_false(res.success)
+                end
+                assert.is_equal(res.code, code)
+            end
         end)
         it("should not crash on bad configuration", function()
+            --no url
+            local res1 = http_client:PUT{}
+            assert.is_false(res1.success)
+            --blank url
+            local res2 = http_client:PUT{url=""}
+            assert.is_false(res2.success)
+            --assert types
+            local res3 = http_client:PUT{url={url=url}}
+            assert.is_false(res3.success)
+            local res4 = http_client:PUT{url=url,headers=""}
+            assert.is_false(res4.success)
         end)
     end)
     describe("PATCH", function()

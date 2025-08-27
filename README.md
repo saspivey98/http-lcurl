@@ -98,4 +98,6 @@ if result.success then print(result.data) end
 
 Using [lua-busted](https://github.com/lunarmodules/busted).
 
+`docker run -d --name httpbin -p 8080:80 kennethreitz/httpbin`
+
 You can run them by running `busted` in the main folder.

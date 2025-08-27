@@ -34,12 +34,29 @@ local CONTENT_TYPE = {
 
 --encode form data for sending files
 local function encodeFormData(data)
-    local parts = {}
-    for k, v in pairs(data) do
-        --table.insert(parts, MIME.encode("url", tostring(k)) .. "=" .. MIME.encode("url", tostring(v)))
-        --TODO
+    --check if string or table, handle differently
+    if type(data) == "string" then
+        return data
+    elseif type(data) == "table" then
+        -- URL encode a single string value
+        local function url_encode(str)
+            if not str or str == "" then return "" end
+            str = string.gsub(str, "\n", "\r\n")
+            str = string.gsub(str, "([^%w%-%.%_%~])", function(c)
+                return string.format("%%%02X", string.byte(c))
+            end)
+            return str
+        end
+        local parts =  {}
+        for k,v in pairs(data) do
+            local enc_k = url_encode(tostring(k))
+            local enc_v = url_encode(tostring(v))
+            table.insert(parts, enc_k.."="..enc_v)
+        end
+        return table.concat(parts, "&")
+    else
+        error("Sanitation function failed. Body type is not string or table.")
     end
-    return table.concat(parts, "&")
 end
 
 -- Helper function to create multipart form data
@@ -111,7 +128,11 @@ local function parseArguments(t)
     local optionals = {"headers", "body", "options"}
     for _,option in ipairs(optionals) do
         if (t[option] ~= nil) then
-            assert(type(t[option]) == "table")
+            if (option == "body" and type(t[option] == "string")) then
+                --skip this assert
+            else
+                assert(type(t[option]) == "table")
+            end
         end
         ret[option] = t[option] or {}
     end
@@ -146,9 +167,7 @@ local function request(method, t)
             request_body = form_data
             request_headers["Content-Type"] = CONTENT_TYPE.FORM
         elseif request_headers["Content-Type"] == CONTENT_TYPE.FORM then
-            if next(body) ~= nil then
-                request_body = encodeFormData(body)
-            end
+            request_body = encodeFormData(body)
         elseif request_headers["Content-Type"] == CONTENT_TYPE.JSON then
             if next(body) ~= nil then
                 request_body = JSON.encode(body)
