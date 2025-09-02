@@ -32,85 +32,6 @@ local CONTENT_TYPE = {
     XML = "application/xml"
 }
 
---encode form data for sending files
-local function encodeFormData(data)
-    --check if string or table, handle differently
-    if type(data) == "string" then
-        return data
-    elseif type(data) == "table" then
-        -- URL encode a single string value
-        local function url_encode(str)
-            if not str or str == "" then return "" end
-            str = string.gsub(str, "\n", "\r\n")
-            str = string.gsub(str, "([^%w%-%.%_%~])", function(c)
-                return string.format("%%%02X", string.byte(c))
-            end)
-            return str
-        end
-        local parts =  {}
-        for k,v in pairs(data) do
-            local enc_k = url_encode(tostring(k))
-            local enc_v = url_encode(tostring(v))
-            table.insert(parts, enc_k.."="..enc_v)
-        end
-        return table.concat(parts, "&")
-    else
-        error("Sanitation function failed. Body type is not string or table.")
-    end
-end
-
--- Helper function to create multipart form data
-local function createMultipartForm(data, files)
-    local boundary = "----LuaCURLBoundary" .. tostring(os.time())
-    local parts = {}
-
-    -- Add regular form fields
-    if data then
-        for k, v in pairs(data) do
-            table.insert(parts, "--" .. boundary)
-            table.insert(parts, 'Content-Disposition: form-data; name="' .. k .. '"')
-            table.insert(parts, "")
-            table.insert(parts, tostring(v))
-        end
-    end
-
-    -- Add file fields
-    if files then
-        for field_name, file_info in pairs(files) do
-            table.insert(parts, "--" .. boundary)
-            local filename = file_info.filename or "file"
-            local content_type = file_info.content_type or "application/octet-stream"
-
-            table.insert(parts, string.format('Content-Disposition: form-data; name="%s"; filename="%s"', 
-                field_name, filename))
-            table.insert(parts, "Content-Type: " .. content_type)
-            table.insert(parts, "")
-
-            -- Read file content
-            local content
-            if file_info.content then
-                content = file_info.content
-            elseif file_info.filepath then
-                local file = io.open(file_info.filepath, "rb")
-                if not file then
-                    error("Could not open file: " .. file_info.filepath)
-                end
-                content = file:read("*all")
-                file:close()
-            else
-                error("File must have either 'content' or 'filepath'")
-            end
-
-            table.insert(parts, content)
-        end
-    end
-
-    table.insert(parts, "--" .. boundary .. "--")
-    table.insert(parts, "")
-
-    return table.concat(parts, "\r\n"), boundary
-end
-
 --do bounds checks of input arguments
 local function parseArguments(t)
     if type(t) ~= "table" then
@@ -156,38 +77,11 @@ local function request(method, t)
         end
     end
 
-    local request_body = ""
-    local result_body = {}
-    local result_headers = {}
-
-    --body has data, encode as JSON
-    if method ~= "GET" then
-        if options.files then
-            local form_data, boundary = createMultipartForm(body, options.files)
-            request_body = form_data
-            request_headers["Content-Type"] = CONTENT_TYPE.FORM
-        elseif request_headers["Content-Type"] == CONTENT_TYPE.FORM then
-            request_body = encodeFormData(body)
-        elseif request_headers["Content-Type"] == CONTENT_TYPE.JSON then
-            if next(body) ~= nil then
-                request_body = JSON.encode(body)
-            else
-                request_body = ""
-            end
-        elseif type(body) == "string" then
-            request_body = body
-        else
-            if next(body) ~= nil then
-                request_body = JSON.encode(body)
-            else
-                error("Failed to make request body.")
-            end
-        end
-    end
-
     --[[
         ssl_verifypeer refers to if the host has a valid CA SSL cert
     --]]
+    local result_body = {}
+    local result_headers = {}
     local INIT = {
         url = url,
         ssl_verifypeer = options.ssl_verifypeer or false,
@@ -244,6 +138,75 @@ local function request(method, t)
     local easy = LCURL.easy(INIT)
     if not easy then error("Failed to initialize cURL: "..tostring(error)) end
 
+    --handle request_body
+    local request_body
+    if options.files or request_headers["Content-Type"] == CONTENT_TYPE.FORM then
+        local form = LCURL.form()
+
+        --if options has files, verify has .name and .path
+        if options.files then
+            for _,file in pairs(options.files) do
+                assert(file.name, "file needs property 'name'")
+                assert(file.path, "file needs property 'path'")
+                file.type = file["type"] or CONTENT_TYPE.TEXT
+                form:add_file(file.name, file.path, file.type)
+            end
+        end
+
+        --if body is populated
+        if body and request_headers["Content-Type"] == CONTENT_TYPE.FORM then
+            local form_data = {}
+            if type(body) == "string" then
+                form_data = JSON.decode(body) or {}
+                if next(form_data) == nil then
+                    --decode by & and =
+                    for pair in body:gmatch("[^&]+") do
+                        local key, value = pair:match("^([^=]+)=(.*)$")
+                        if key then
+                            -- URL decode key and value
+                            key = key:gsub("+", " "):gsub("%%(%x%x)", function(hex)
+                                return string.char(tonumber(hex, 16))
+                            end)
+
+                            value = value:gsub("+", " "):gsub("%%(%x%x)", function(hex)
+                                return string.char(tonumber(hex, 16))
+                            end)
+
+                            form_data[key] = value
+                        else
+                            -- Handle case where there's no = (just a key)
+                            local decoded_key = pair:gsub("+", " "):gsub("%%(%x%x)", function(hex)
+                                return string.char(tonumber(hex, 16))
+                            end)
+                            form_data[decoded_key] = ""
+                        end
+                    end
+                end
+            elseif type(body) == "table" then
+                if next(body) ~= nil then form_data = body end
+            end
+
+            for k,v in pairs(form_data) do
+                form:add_content(k, tostring(v))
+            end
+        end
+        request_body = ""
+        easy:setopt_httppost(form)
+        request_headers["Content-Type"] = nil
+    elseif type(body) == "string" then
+        request_body = body
+    else --default and JSON
+        if next(body) ~= nil then
+            request_body = JSON.encode(body)
+        else
+            if type(body) == "table" then
+                request_body = ""
+            else
+                request_body = tostring(body)
+            end
+        end
+    end
+
     --if username and password, make Basic Auth
     if (request_headers["username"] and request_headers["password"] and options.ignoreBasicAuth == nil) then
         easy:setopt_userpwd(request_headers["username"]..":"..request_headers["password"])
@@ -253,6 +216,7 @@ local function request(method, t)
 
     --set request type
     easy:setopt_customrequest(method)
+    if method == METHOD.HEAD then easy:setopt_nobody(true) end
 
     --[[
     proxy options:

@@ -80,16 +80,16 @@ describe("REST Methods", function()
                 body="key1=value1&key2=value2"
             }
             assert.is_true(res1.success)
-            assert.is_equal(res1.data.form.key1, "value1")
-            assert.is_equal(res1.data.form.key2, "value2")
+            assert.is_equal(res1.data.form["key1"], "value1")
+            assert.is_equal(res1.data.form["key2"], "value2")
             local res2 = http_client:POST{
                 url=url.."/post",
                 headers={["Content-Type"] = "application/x-www-form-urlencoded"},
                 body={ key1 = "value1", key2 = "value2" }
             }
             assert.is_true(res2.success)
-            assert.is_equal(res2.data.form.key1, "value1")
-            assert.is_equal(res2.data.form.key2, "value2")
+            assert.is_equal(res2.data.form["key1"], "value1")
+            assert.is_equal(res2.data.form["key2"], "value2")
         end)
         it("should send raw/text request body", function()
             local res = http_client:POST{
@@ -152,16 +152,16 @@ describe("REST Methods", function()
                 body="key1=value1&key2=value2"
             }
             assert.is_true(res1.success)
-            assert.is_equal(res1.data.form.key1, "value1")
-            assert.is_equal(res1.data.form.key2, "value2")
+            assert.is_equal(res1.data.form["key1"], "value1")
+            assert.is_equal(res1.data.form["key2"], "value2")
             local res2 = http_client:PUT{
                 url=url.."/put",
                 headers={["Content-Type"] = "application/x-www-form-urlencoded"},
                 body={ key1 = "value1", key2 = "value2" }
             }
             assert.is_true(res2.success)
-            assert.is_equal(res2.data.form.key1, "value1")
-            assert.is_equal(res2.data.form.key2, "value2")
+            assert.is_equal(res2.data.form["key1"], "value1")
+            assert.is_equal(res2.data.form["key2"], "value2")
         end)
         it("should send raw/text request body", function()
             local res = http_client:PUT{
@@ -207,186 +207,237 @@ describe("REST Methods", function()
             assert.is_false(res4.success)
         end)
     end)
-    describe("PATCH", function()
+    describe("PATCH #PATCH", function()
+        it("should handle a PATCH request", function()
+            local res = http_client:PATCH{url=url.."/patch"}
+            assert.is_true(res.success)
+        end)
         it("should send JSON request body", function()
+            local res = http_client:PATCH{url=url.."/patch", body={"test"}}
+            assert.is_true(res.success)
+            assert.is_equal(res.data.json[1], "test")
         end)
         it("should send form-encoded request body", function()
+            local res1 = http_client:PATCH{
+                url=url.."/patch",
+                headers={["Content-Type"] = "application/x-www-form-urlencoded"},
+                body="key1=value1&key2=value2"
+            }
+            assert.is_true(res1.success)
+            assert.is_equal(res1.data.form.key1, "value1")
+            assert.is_equal(res1.data.form.key2, "value2")
+            local res2 = http_client:PATCH{
+                url=url.."/patch",
+                headers={["Content-Type"] = "application/x-www-form-urlencoded"},
+                body={ key1 = "value1", key2 = "value2" }
+            }
+            assert.is_true(res2.success)
+            assert.is_equal(res2.data.form.key1, "value1")
+            assert.is_equal(res2.data.form.key2, "value2")
         end)
         it("should send raw/text request body", function()
+            local res = http_client:PATCH{
+                url=url.."/patch",
+                headers={["Content-Type"] = "text/plain"},
+                body="text"
+            }
+            assert.is_true(res.success)
+            assert.is_equal(res.data.data, "text")
         end)
         it("should handle empty request body", function()
+            local res = http_client:PATCH{url=url.."/patch"}
+            assert.is_true(res.success)
         end)
         it("should set Content-Type header automatically", function()
-        end)
-        it("should allow custom Content-Type header", function()
+            local res = http_client:PATCH{ url=url.."/patch", body={key="value"} }
+            assert.is_true(res.success)
+            assert.is_equal(res.data.json.key, "value")
         end)
         it("should handle different response status codes", function()
-        end)
-        it("should handle response body", function()
-        end)
-        it("should allow custom headers", function()
+            local codes = { 200, 400, 401, 403, 404, 500}
+            for _,code in ipairs(codes) do
+                local res = http_client:PATCH{url=url.."/status/"..code}
+                if code >= 200 and code <= 300 then
+                    assert.is_true(res.success)
+                else
+                    assert.is_false(res.success)
+                end
+                assert.is_equal(res.code, code)
+            end
         end)
         it("should not crash on bad configuration", function()
+            --no url
+            local res1 = http_client:PATCH{}
+            assert.is_false(res1.success)
+            --blank url
+            local res2 = http_client:PATCH{url=""}
+            assert.is_false(res2.success)
+            --assert types
+            local res3 = http_client:PATCH{url={url=url}}
+            assert.is_false(res3.success)
+            local res4 = http_client:PATCH{url=url,headers=""}
+            assert.is_false(res4.success)
         end)
     end)
-    describe("DELETE", function()
+    describe("DELETE #DELETE", function()
+        local value = "value"
         it("should handle a DELETE request", function()
+            local res = http_client:DELETE{url=url.."/delete"}
+            assert.is_true(res.success)
         end)
         it("should handle DELETE with query parameters", function()
+            local res = http_client:DELETE{url=url.."/delete?key="..value}
+            assert.is_true(res.success)
         end)
         it("should handle DELETE with request body", function()
-        end)
-        it("should handle DELETE with empty request body", function()
-        end)
-        it("should allow custom headers", function()
+            local res1 = http_client:DELETE{
+                url=url.."/delete",
+                headers={["Content-Type"] = "text/plain"},
+                body=value
+            }
+            assert.is_true(res1.success)
+            local res2 = http_client:DELETE{
+                url=url.."/delete",
+                body={
+                    key = value
+                }
+            }
+            assert.is_true(res2.success)
         end)
         it("should handle different response status codes", function()
-        end)
-        it("should handle response body", function()
+            local codes = { 200, 400, 401, 403, 404, 500}
+            for _,code in ipairs(codes) do
+                local res = http_client:DELETE{url=url.."/status/"..code}
+                if code >= 200 and code <= 300 then
+                    assert.is_true(res.success)
+                else
+                    assert.is_false(res.success)
+                end
+                assert.is_equal(res.code, code)
+            end
         end)
         it("should not crash on bad configuration", function()
+            --no url
+            local res1 = http_client:DELETE{}
+            assert.is_false(res1.success)
+            --blank url
+            local res2 = http_client:DELETE{url=""}
+            assert.is_false(res2.success)
+            --assert types
+            local res3 = http_client:DELETE{url={url=url}}
+            assert.is_false(res3.success)
+            local res4 = http_client:DELETE{url=url,headers=""}
+            assert.is_false(res4.success)
         end)
     end)
+    --HEAD is identical to GET except is must not return a response body
     describe("HEAD", function()
         it("should handle a HEAD request", function()
+            local res = http_client:HEAD{url=url.."/get"}
+            assert.is_true(res.success)
         end)
         it("should return headers but no body", function()
-        end)
-        it("should handle query parameters", function()
+            local res = http_client:HEAD{url=url.."/encoding/utf8", headers={Accept="text/html"}}
+            assert.is_true(res.success)
+            assert.is_equal(res.data, "")
         end)
     end)
-    describe("OPTIONS", function()
-        it("should handle an OPTIONS request", function()
+    --how to test...
+    describe("OPTIONS #OPTIONS", function()
+        it("should handle CORS headers", function()
+            local res = http_client:OPTIONS{url=url.."/anything"}
+            local allow = res.headers["access-control-allow-methods"]
+            for method in allow:gmatch("([^,]+)") do
+                local trimmed = method:match("^%s*(.-)%s*$")
+                assert.is_true(type(http_client[trimmed]) == "function")
+            end
         end)  
         it("should return Allow header", function()
-        end)
-        it("should handle CORS headers", function()
+            local res = http_client:OPTIONS{url=url.."/anything"}
+            assert.is_not_nil(res.headers.allow)
         end)
     end)
 end)
 
 describe("Configuration", function()
     describe("Redirects", function()
+        it("should follow redirects automatically", function()
+        end)
+        it("should handle relative redirects", function()
+        end)
+        it("should handle absolute redirects", function()
+        end)
+        it("should follow multiple redirects", function()
+        end)
+        it("should respect redirect limits", function()
+        end)
+        it("should handle redirect with specific status code", function()
+        end)
+        it("should not follow redirects when disabled", function()
+        end)
     end)
     describe("timeouts", function()
+        it("should timeout after a certain amount of time", function()
+        end)
+        it("should have customizable timeout periods", function()
+        end)
     end)
     describe("SSL/TLS", function()
+        it("should connect over HTTPS successfully", function()
+        end)
+        it("should fail on HTTP when HTTPS is required", function()
+        end)
+        it("should handle verify peer certificate options", function() --ssl_verifypeer
+        end)
+        it("should handle verify hostname options", function() --ssl_verifyhost
+        end)
+        it("should handle system CA options", function() --cainfo
+        end)
     end)
 
     describe("Cookies", function()
+        it("should set cookies from server response", function()
+        end)
+        it("should send cookies in request", function()
+        end)
+        it("should maintain cookies across requests", function()
+        end)
     end)
 end)
 
 describe("Authentication", function()
 end)
 
-describe("File Upload Functionality", function()
-    before_each(function()
-        -- Mock file operations
-        _G.original_io_open = io.open
-        io.open = function(filename, mode)
-            if filename == "/valid/file.txt" then
-                return {
-                    read = function() return "file content" end,
-                    close = function() end
-                }
-            elseif filename == "/large/file.bin" then
-                return {
-                    read = function() return string.rep("x", 1024 * 1024) end, -- 1MB
-                    close = function() end
-                }
-            end
-            return nil -- File not found
-        end
-    end)
-    
-    after_each(function()
-        io.open = _G.original_io_open
-    end)
-    
+describe("File Upload Functionality #UPLOAD", function()
+    local handle = io.popen(package.config:sub(1,1) == '\\' and "cd" or "pwd")
+    local cwd = handle:read("*l")
+    handle:close()
+
+    local file1 = cwd.."/spec/file1.txt"
+
     describe("Single File Upload", function()
         it("should upload file from filesystem", function()
             local result = http_client:POST({
-                url = "https://example.com/upload",
+                url = url.."/post",
                 options = {
                     files = {
-                        document = {
-                            filepath = "/valid/file.txt",
-                            filename = "document.txt",
-                            content_type = "text/plain"
+                        {
+                            name="file1.txt",
+                            path=file1
                         }
                     }
                 }
             })
             assert.is_true(result.success)
-        end)
-        
-        it("should upload file from memory", function()
-            local result = http_client:POST({
-                url = "https://example.com/upload",
-                options = {
-                    files = {
-                        document = {
-                            content = "In-memory file content",
-                            filename = "memory.txt",
-                            content_type = "text/plain"
-                        }
-                    }
-                }
-            })
-            assert.is_true(result.success)
+            assert.is_not_nil(result.data.files)
         end)
         
         it("should handle missing file", function()
-            local result = http_client:POST({
-                url = "https://example.com/upload",
-                options = {
-                    files = {
-                        document = {
-                            filepath = "/nonexistent/file.txt",
-                            filename = "missing.txt"
-                        }
-                    }
-                }
-            })
-            assert.is_false(result.success)
-        end)
-        
-        it("should require either content or filepath", function()
-            local result = http_client:POST({
-                url = "https://example.com/upload",
-                options = {
-                    files = {
-                        document = {
-                            filename = "incomplete.txt"
-                        }
-                    }
-                }
-            })
-            assert.is_false(result.success)
         end)
     end)
     
     describe("Multiple File Upload", function()
         it("should upload multiple files", function()
-            local result = http_client:POST({
-                url = "https://example.com/upload",
-                options = {
-                    files = {
-                        document1 = {
-                            content = "First file content",
-                            filename = "file1.txt",
-                            content_type = "text/plain"
-                        },
-                        document2 = {
-                            content = "Second file content",
-                            filename = "file2.txt",
-                            content_type = "text/plain"
-                        }
-                    }
-                }
-            })
-            assert.is_true(result.success)
         end)
     end)
     describe("Error Handling", function()

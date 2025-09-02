@@ -1,4 +1,7 @@
 # http-lcurl
+
+[![CI](https://github.com/saspivey98/http-lcurl/actions/workflows/CI.yml/badge.svg)](https://github.com/saspivey98/http-lcurl/actions/workflows/ci.yml)
+
 A friendly HTTP interface for lcurl.
 
 - Wrapper for lua-curl. Documentation can be found [here](https://lua-curl.github.io/lcurl/modules/lcurl.html). 

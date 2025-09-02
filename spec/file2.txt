@@ -1,0 +1,4 @@
+This is line 1 in a multi-line test file.
+This is line 2 in a multi-line test file.
+This is line 3 in a multi-line test file.
+This is line 4 in a multi-line test file.
