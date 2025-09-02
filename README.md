@@ -1,6 +1,6 @@
 # http-lcurl
 
-[![CI](https://github.com/saspivey98/http-lcurl/actions/workflows/CI.yml/badge.svg)](https://github.com/saspivey98/http-lcurl/actions/workflows/ci.yml)
+[![CI](https://github.com/saspivey98/http-lcurl/actions/workflows/CI.yml/badge.svg)](https://github.com/saspivey98/http-lcurl/actions/workflows/CI.yml)
 
 A friendly HTTP interface for lcurl.
 
