@@ -23,7 +23,9 @@ or... (Doesn't work right now, will add to luarocks.org later)
 - lua >= 5.3
 - [lua-curl](https://github.com/Lua-cURL/Lua-cURLv3) >= 0.3.13
 - [rapidjson](https://github.com/xpol/lua-rapidjson) >= 0.7.1
-- [luasocket](https://github.com/lunarmodules/luasocket) >= 3.1.0
+
+*Optional:
+- [xml2lua](https://github.com/manoelcampos/xml2lua) >= 1.6.0
 
 ## Usage
 

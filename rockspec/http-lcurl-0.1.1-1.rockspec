@@ -11,10 +11,10 @@ description = {
     license = "MIT",
 }
 dependencies = {
-    "lua >= 5.3",
+    "lua >= 5.1",
     "lua-curl >= 0.3.13",
     "rapidjson >= 0.7.1",
-    "luasocket >= 3.1.0" --needed for MIME
+    "xml2lua >= 1.6.0"
 }
 build = {
     type="builtin",

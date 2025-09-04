@@ -1,8 +1,7 @@
 package.path = "../?.lua;" .. package.path
-local package_path = [[C:\Users\sspivey\.vscode\extensions\sspivey.lua-inmation-debugger-1.0.2\runtime\win32-x64\lua53]]
-package.path = package_path.."/?.lua;" .. package.path
-package.cpath = package_path.."/?.dll;" .. package.cpath
+
 require 'busted.runner'()
+package.loaded['http-lcurl'] = nil
 local http_client = require('http-lcurl')
 
 local url = "http://localhost:8080"
@@ -359,17 +358,27 @@ describe("REST Methods", function()
     end)
 end)
 
-describe("Configuration", function()
+describe("Configuration #CONFIG", function()
     describe("Redirects", function()
+        local headers = { accept = "text/html" }
         it("should follow redirects automatically", function()
-        end)
-        it("should handle relative redirects", function()
+            local res = http_client:GET{url=url.."/redirect-to?url=get", headers=headers}
+            assert.is_true(res.success)
         end)
         it("should handle absolute redirects", function()
+            local res = http_client:GET{url=url.."/absolute-redirect/1", headers=headers}
+            assert.is_true(res.success)
         end)
         it("should follow multiple redirects", function()
+            local res = http_client:GET{url=url.."/redirect/3", headers=headers}
+            assert.is_true(res.success)
         end)
         it("should respect redirect limits", function()
+            local options = { maxredirs = 2 }
+            local res1 = http_client:GET{url=url.."/redirect/2", headers=headers, options=options}
+            assert.is_true(res1.success)
+            local res2 = http_client:GET{url=url.."/redirect/3", headers=headers, options=options}
+            assert.is_false(res2.success)
         end)
         it("should handle redirect with specific status code", function()
         end)

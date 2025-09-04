@@ -1,11 +1,35 @@
 local lib = {}
 
 function lib:INFO(_)
+    local info = {}
+    for k in pairs(self) do table.insert(info, k) end
+    return {
+        version = {
+            major = 0,
+            minor = 1,
+            revision = 2,
+        },
+        library = {
+            modulename = "http-lcurl"
+        },
+        dependencies = {
+            "lua-curl",
+            "rapidjson",
+            "xml2lua"
+        },
+        functions = info
+    }
 end
 
-local JSON = require('rapidjson')
 local LCURL = require('lcurl')
-local XML = require('lxp.totable')
+local JSON = require('rapidjson')
+--optionally include xml2lua
+local function safe_require(module)
+    local ok, mod = pcall(require, module)
+    return ok and mod or nil
+end
+local XML = safe_require('xml2lua') or safe_require('lua.modules.xml2lua')
+local HANDLER = safe_require('xmlhandler.tree') or safe_require('lua.modules.xmlhandler_tree')
 
 local DEFAULT_HEADERS = {
     ["Content-Type"] = "application/json",
@@ -24,9 +48,11 @@ local METHOD = {
     OPTIONS = "OPTIONS"
 }
 
-local CONTENT_TYPE = {
-    JSON = "application/json",
+--public enum
+lib.CONTENT_TYPE = {
     FORM = "application/x-www-form-urlencoded",
+    HTML = "text/html",
+    JSON = "application/json",
     MULTIPART = "multipart/form-data",
     TEXT = "text/plain",
     XML = "application/xml"
@@ -140,7 +166,7 @@ local function request(method, t)
 
     --handle request_body
     local request_body
-    if options.files or request_headers["Content-Type"] == CONTENT_TYPE.FORM then
+    if options.files or request_headers["Content-Type"] == lib.CONTENT_TYPE.FORM then
         local form = LCURL.form()
 
         --if options has files, verify has .name and .path
@@ -148,13 +174,13 @@ local function request(method, t)
             for _,file in pairs(options.files) do
                 assert(file.name, "file needs property 'name'")
                 assert(file.path, "file needs property 'path'")
-                file.type = file["type"] or CONTENT_TYPE.TEXT
+                file.type = file["type"] or lib.CONTENT_TYPE.TEXT
                 form:add_file(file.name, file.path, file.type)
             end
         end
 
         --if body is populated
-        if body and request_headers["Content-Type"] == CONTENT_TYPE.FORM then
+        if body and request_headers["Content-Type"] == lib.CONTENT_TYPE.FORM then
             local form_data = {}
             if type(body) == "string" then
                 form_data = JSON.decode(body) or {}
@@ -265,15 +291,27 @@ local function request(method, t)
         if type(result_body) == "table" then --usually returns array
             data = table.concat(result_body) --take first element
             if data ~= "" then
-                --if result_headers["Content-Encoding"] then end --check if there is encoding?
-                local content_type = result_headers["content-type"] or ""
-                if content_type:lower():find("application/json") then
-                    data = JSON.decode(data) or data
-                elseif content_type:lower():find("application/xml") then
-                    data = XML.torecord(XML.clean(XML.parse(data))) or data
+                -- check for redirects
+                local content_type
+                if type(result_headers["content-type"]) == "table" then
+                    content_type = result_headers["content-type"][#result_headers["content-type"]] or ""
+                else
+                    content_type = result_headers["content-type"] or ""
                 end
-            else
-                --no data
+                --if result_headers["Content-Encoding"] then end --*check if there is encoding?
+                if content_type:lower():find(lib.CONTENT_TYPE.JSON) then
+                    data = JSON.decode(data) or data
+                elseif content_type:lower():find(lib.CONTENT_TYPE.XML) then
+                    --if xml2lua is found, then try to use it. Else return as string
+                    if XML and HANDLER then
+                        local tree_handler = HANDLER:new()
+                        local xml_parser = XML.parser(tree_handler)
+                        xml_parser:parse(data)
+                        data = tree_handler.root
+                    else
+                        data = data
+                    end
+                end
             end
         else
             data = result_body
@@ -290,47 +328,62 @@ local function request(method, t)
     }
 end
 
+local function retError(err)
+    local code, msg
+    if type(err) == "userdata" then
+        code = err:no()
+        msg = err:msg() or err:__tostring()
+    else
+        code = 0
+        msg = tostring(err)
+    end
+    return {
+        success = false,
+        code = code,
+        msg = msg
+    }
+end
+
 function lib:GET(args)
     local ok, res = pcall(request, METHOD.GET, args)
-    if not(ok) then return {success=false,"Error: "..res} end
+    if not(ok) then return retError(res) end
     return res
 end
 
 function lib:PUT(args)
     local ok, res = pcall(request, METHOD.PUT, args)
-    if not(ok) then return {success=false,"Error: "..res} end
+    if not(ok) then return retError(res) end
     return res
 end
 
 function lib:POST(args)
     local ok, res = pcall(request, METHOD.POST, args)
-    if not(ok) then return {success=false,"Error: "..res} end
+    if not(ok) then return retError(res) end
     return res
 end
 
 function lib:PATCH(args)
     local ok, res = pcall(request, METHOD.PATCH, args)
-    if not(ok) then return {success=false,"Error: "..res} end
+    if not(ok) then return retError(res) end
     return res
 end
 
 function lib:DELETE(args)
     local ok, res = pcall(request, METHOD.DELETE, args)
-    if not(ok) then return {success=false,"Error: "..res} end
+    if not(ok) then return retError(res) end
     return res
 end
 
 function lib:HEAD(args)
     local ok, res = pcall(request, METHOD.HEAD, args)
-    if not(ok) then return {success=false,"Error: "..res} end
+    if not(ok) then return retError(res) end
     return res
 end
 
 function lib:OPTIONS(args)
     local ok, res = pcall(request, METHOD.OPTIONS, args)
-    if not(ok) then return {success=false,"Error: "..res} end
+    if not(ok) then return retError(res) end
     return res
 end
-
 
 return lib
