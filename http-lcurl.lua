@@ -92,10 +92,14 @@ local function request(method, t)
     --sanitize inputs
     local args = parseArguments(t)
     local url = args.url
-    local request_headers = args["headers"]
+    local request_headers = {}
     local body = args["body"]
     local options = args["options"]
 
+    --copy headers over
+    for k,v in pairs(args["headers"]) do
+        request_headers[k] = v
+    end
     --merge headers with defaults
     for k,v in pairs(DEFAULT_HEADERS) do
         if request_headers[k] == nil then
@@ -112,8 +116,8 @@ local function request(method, t)
         url = url,
         ssl_verifypeer = options.ssl_verifypeer or false,
         verbose = options.verbose or 0,
-        timeout = options.timeout or 30,
-        followlocation = options.followlocation or true,
+        timeout = options.timeout or 5,
+        followlocation = (options.followlocation == nil and true) or options.followlocation,
         maxredirs = options.maxredirs or 5,
         writefunction = function(data)
             if data and type(data) == "string" then
@@ -187,23 +191,20 @@ local function request(method, t)
                 if next(form_data) == nil then
                     --decode by & and =
                     for pair in body:gmatch("[^&]+") do
+                        local function decode_url(str)
+                            --replaces '+' with spaces & converts hex values to chars
+                            return str:gsub("+", " "):gsub("%%(%x%x)", function(hex)
+                                return string.char(tonumber(hex, 16))
+                            end)
+                        end
                         local key, value = pair:match("^([^=]+)=(.*)$")
                         if key then
-                            -- URL decode key and value
-                            key = key:gsub("+", " "):gsub("%%(%x%x)", function(hex)
-                                return string.char(tonumber(hex, 16))
-                            end)
-
-                            value = value:gsub("+", " "):gsub("%%(%x%x)", function(hex)
-                                return string.char(tonumber(hex, 16))
-                            end)
-
+                            key = decode_url(key) or ""
+                            value = decode_url(value)
                             form_data[key] = value
                         else
                             -- Handle case where there's no = (just a key)
-                            local decoded_key = pair:gsub("+", " "):gsub("%%(%x%x)", function(hex)
-                                return string.char(tonumber(hex, 16))
-                            end)
+                            local decoded_key = decode_url(pair) or ""
                             form_data[decoded_key] = ""
                         end
                     end
@@ -233,8 +234,11 @@ local function request(method, t)
         end
     end
 
-    --if username and password, make Basic Auth
+    --if username and password, make Basic Auth Token
     if (request_headers["username"] and request_headers["password"] and options.ignoreBasicAuth == nil) then
+        if options.digestAuth then easy:setopt_httpauth(LCURL.AUTH_DIGEST) end
+        if options.NTLMAuth then easy:setopt_httpauth(LCURL.AUTH_NTLM) end
+        if options.negotiateAuth then easy:setopt_httpauth(LCURL.AUTH_NEGOTIATE) end
         easy:setopt_userpwd(request_headers["username"]..":"..request_headers["password"])
         request_headers["username"] = nil
         request_headers["password"] = nil
