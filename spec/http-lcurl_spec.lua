@@ -460,13 +460,14 @@ describe("Configuration #CONFIG", function()
             assert.is_not_nil(res.data.headers.Authorization)
             assert.is_not_nil(string.find(res.data.headers.Authorization, "NTLM"))
         end)
-        it("should support Negotiate authentication", function()
-            local options = { negotiateAuth = true }
-            local res = http_client:GET{url=url.."/get", headers=headers, options=options}
-            assert.is_true(res.success)
-            assert.is_not_nil(res.data.headers.Authorization)
-            assert.is_not_nil(string.find(res.data.headers.Authorization, "Negotiate"))
-        end)
+        --* This test only works on Windows. Special linux configuration is required
+        -- it("should support Negotiate authentication", function()
+        --     local options = { negotiateAuth = true }
+        --     local res = http_client:GET{url=url.."/get", headers=headers, options=options}
+        --     assert.is_true(res.success)
+        --     assert.is_not_nil(res.data.headers.Authorization)
+        --     assert.is_not_nil(string.find(res.data.headers.Authorization, "Negotiate"))
+        -- end)
     end)
 end)
 
@@ -502,7 +503,7 @@ describe("File Upload Functionality #UPLOAD", function()
                     files = {
                         {
                             name="file_bad.txt",
-                            path=cwd
+                            path=cwd.."/file_bad.txt"
                         }
                     }
                 }
@@ -510,7 +511,7 @@ describe("File Upload Functionality #UPLOAD", function()
             assert.is_false(result.success)
         end)
     end)
-    
+
     describe("Multiple File Upload", function()
         it("should upload multiple files", function()
                         local result = http_client:POST({
@@ -531,9 +532,6 @@ describe("File Upload Functionality #UPLOAD", function()
             assert.is_true(result.success)
             assert.is_not_nil(result.data.files)
         end)
-    end)
-    describe("Error Handling", function()
-    -- Network errors, malformed responses, connection failures
     end)
 end)
 
