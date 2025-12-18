@@ -238,12 +238,12 @@ local function request(method, t)
         if body then
             if next(body) ~= nil then
                 request_body = JSON.encode(body)
-            end
-        else
-            if type(body) == "table" then
-                request_body = ""
             else
-                request_body = tostring(body)
+                if type(body) == "table" then
+                    request_body = ""
+                else
+                    request_body = tostring(body)
+                end
             end
         end
     end
