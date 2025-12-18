@@ -12,15 +12,15 @@ A friendly HTTP interface for lcurl.
 - Supports file uploads on `POST/PUT` requests
 
 ## Installation
+1. `luarocks install http-lcurl`
+
+or...
+
 1. `git clone https://github.com/saspivey98/http-lcurl.git`
 2. `luarocks install ./http-lcurl-0.1.1-1.rockspec`
 
-or... (Doesn't work right now, will add to luarocks.org later)
-
-1. `luarocks install http-lcurl`
-
 ### Dependencies
-- lua >= 5.3
+- lua >= 5.1
 - [lua-curl](https://github.com/Lua-cURL/Lua-cURLv3) >= 0.3.13
 - [rapidjson](https://github.com/xpol/lua-rapidjson) >= 0.7.1
 

@@ -1,5 +1,8 @@
+---@class http-lcurl
 local lib = {}
 
+---return file info; for embedded purposes
+---@private
 function lib:INFO(_)
     local info = {}
     for k in pairs(self) do table.insert(info, k) end
@@ -7,7 +10,7 @@ function lib:INFO(_)
         version = {
             major = 0,
             minor = 1,
-            revision = 2,
+            revision = 3,
         },
         library = {
             modulename = "http-lcurl"
@@ -37,8 +40,9 @@ local DEFAULT_HEADERS = {
     ["User-Agent"] = "Lua-cURLv3",
 }
 
---enumerator of applicable methods
-local METHOD = {
+---enumerator of applicable methods
+---@enum http-lcurl.METHOD
+lib.METHOD = {
     GET = "GET",
     POST = "POST",
     PUT = "PUT",
@@ -48,7 +52,7 @@ local METHOD = {
     OPTIONS = "OPTIONS"
 }
 
---public enum
+---@enum http-lcurl.CONTENT_TYPE
 lib.CONTENT_TYPE = {
     FORM = "application/x-www-form-urlencoded",
     HTML = "text/html",
@@ -58,7 +62,11 @@ lib.CONTENT_TYPE = {
     XML = "application/xml"
 }
 
---do bounds checks of input arguments
+---do bounds checks of input arguments
+---@private
+---@alias http-lcurl.arguments {url:string,headers?:table,body?:table|string,options?:table|string}
+---@param t http-lcurl.arguments
+---@return http-lcurl.arguments
 local function parseArguments(t)
     if type(t) ~= "table" then
         error("insufficient arguments")
@@ -87,14 +95,18 @@ local function parseArguments(t)
     return ret
 end
 
---main function
+---main function
+---@alias http-lcurl.success {code:number,success:boolean,url:string,data:table|string,headers:table}
+---@param method http-lcurl.METHOD
+---@param t http-lcurl.arguments
+---@return http-lcurl.success|http-lcurl.error
 local function request(method, t)
     --sanitize inputs
     local args = parseArguments(t)
     local url = args.url
     local request_headers = {}
     local body = args["body"]
-    local options = args["options"]
+    local options = args["options"] or {}
 
     --copy headers over
     for k,v in pairs(args["headers"]) do
@@ -223,8 +235,10 @@ local function request(method, t)
     elseif type(body) == "string" then
         request_body = body
     else --default and JSON
-        if next(body) ~= nil then
-            request_body = JSON.encode(body)
+        if body then
+            if next(body) ~= nil then
+                request_body = JSON.encode(body)
+            end
         else
             if type(body) == "table" then
                 request_body = ""
@@ -246,7 +260,7 @@ local function request(method, t)
 
     --set request type
     easy:setopt_customrequest(method)
-    if method == METHOD.HEAD then easy:setopt_nobody(true) end
+    if method == lib.METHOD.HEAD then easy:setopt_nobody(true) end
 
     --[[
     proxy options:
@@ -269,7 +283,7 @@ local function request(method, t)
 
     --handle post body
     local body_length = string.len(request_body)
-    if (method ~= METHOD.GET and body_length > 0) then
+    if (method ~= lib.METHOD.GET and body_length > 0) then
         easy:setopt_postfields(request_body)
         request_headers["Content-Length"] = body_length
     end
@@ -332,12 +346,23 @@ local function request(method, t)
     }
 end
 
+---@class http-lcurl.CurlError
+---@field no fun(self): number
+---@field msg fun(self): string
+---@field __tostring fun(self): string
+
+---@private
+---@alias http-lcurl.error {success:boolean,code:number,msg:string}
+---@param err http-lcurl.CurlError|string
+---@return http-lcurl.error
 local function retError(err)
     local code, msg
     if type(err) == "userdata" then
+        ---@cast err http-lcurl.CurlError
         code = err:no()
         msg = err:msg() or err:__tostring()
     else
+        ---@cast err string
         code = 0
         msg = tostring(err)
     end
@@ -348,44 +373,65 @@ local function retError(err)
     }
 end
 
+---HTTP GET Request
+---@param args http-lcurl.arguments
+---@return http-lcurl.success|http-lcurl.error
 function lib:GET(args)
-    local ok, res = pcall(request, METHOD.GET, args)
+    local ok, res = pcall(request, self.METHOD.GET, args)
     if not(ok) then return retError(res) end
     return res
 end
 
+---HTTP PUT Request
+---@param args http-lcurl.arguments
+---@return http-lcurl.success|http-lcurl.error
 function lib:PUT(args)
-    local ok, res = pcall(request, METHOD.PUT, args)
+    local ok, res = pcall(request, self.METHOD.PUT, args)
     if not(ok) then return retError(res) end
     return res
 end
 
+---HTTP POST Request
+---@param args http-lcurl.arguments
+---@return http-lcurl.success|http-lcurl.error
 function lib:POST(args)
-    local ok, res = pcall(request, METHOD.POST, args)
+    local ok, res = pcall(request, self.METHOD.POST, args)
     if not(ok) then return retError(res) end
     return res
 end
 
+---HTTP PATCH Request
+---@param args http-lcurl.arguments
+---@return http-lcurl.success|http-lcurl.error
 function lib:PATCH(args)
-    local ok, res = pcall(request, METHOD.PATCH, args)
+    local ok, res = pcall(request, self.METHOD.PATCH, args)
     if not(ok) then return retError(res) end
     return res
 end
 
+---HTTP DELETE Request
+---@param args http-lcurl.arguments
+---@return http-lcurl.success|http-lcurl.error
 function lib:DELETE(args)
-    local ok, res = pcall(request, METHOD.DELETE, args)
+    local ok, res = pcall(request, self.METHOD.DELETE, args)
     if not(ok) then return retError(res) end
     return res
 end
 
+---HTTP HEAD Request
+---@param args http-lcurl.arguments
+---@return http-lcurl.success|http-lcurl.error
 function lib:HEAD(args)
-    local ok, res = pcall(request, METHOD.HEAD, args)
+    local ok, res = pcall(request, self.METHOD.HEAD, args)
     if not(ok) then return retError(res) end
     return res
 end
 
+---HTTP OPTIONS Request
+---@param args http-lcurl.arguments
+---@return http-lcurl.success|http-lcurl.error
 function lib:OPTIONS(args)
-    local ok, res = pcall(request, METHOD.OPTIONS, args)
+    local ok, res = pcall(request, self.METHOD.OPTIONS, args)
     if not(ok) then return retError(res) end
     return res
 end
