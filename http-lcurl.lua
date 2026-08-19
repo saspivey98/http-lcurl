@@ -95,6 +95,30 @@ local function parseArguments(t)
     return ret
 end
 
+---helper function to encode string
+---@param str string
+---@return string
+local function urlencode(str)
+    str = tostring(str)
+    str = str:gsub("\n", "\r\n")
+    str = str:gsub("([^%w%-%.%_%~ ])", function(c)
+        return string.format("%%%02X", string.byte(c))
+    end)
+    str = str:gsub(" ", "+")
+    return str
+end
+
+---helper function to encode form
+---@param tbl table
+---@return string
+local function encode_form_table(tbl)
+    local parts = {}
+    for k, v in pairs(tbl) do
+        table.insert(parts, urlencode(k) .. "=" .. urlencode(tostring(v)))
+    end
+    return table.concat(parts, "&")
+end
+
 ---main function
 ---@alias http-lcurl.success {code:number,success:boolean,url:string,data:table|string,headers:table}
 ---@param method http-lcurl.METHOD
@@ -182,16 +206,22 @@ local function request(method, t)
 
     --handle request_body
     local request_body
-    if options.files or request_headers["Content-Type"] == lib.CONTENT_TYPE.FORM then
+    if options.files then
         local form = LCURL.form()
 
         --if options has files, verify has .name and .path
-        if options.files then
-            for _,file in pairs(options.files) do
-                assert(file.name, "file needs property 'name'")
-                assert(file.path, "file needs property 'path'")
-                file.type = file["type"] or lib.CONTENT_TYPE.TEXT
-                form:add_file(file.name, file.path, file.type)
+        for _,file in pairs(options.files) do
+            assert(file.name, "file needs property 'name'")
+            assert(file.path, "file needs property 'path'")
+            file.type = file["type"] or lib.CONTENT_TYPE.TEXT
+            form:add_file(file.name, file.path, file.type)
+        end
+
+
+        --allow extra non-file fields to ride along in the multipart body
+        if body and type(body) == "table" and next(body) ~= nil then
+            for k,v in pairs(body) do
+                form:add_content(k, tostring(v))
             end
         end
 
@@ -231,9 +261,11 @@ local function request(method, t)
         end
         request_body = ""
         easy:setopt_httppost(form)
-        request_headers["Content-Type"] = nil
+        request_headers["Content-Type"] = nil --curl sets its own
     elseif type(body) == "string" then
         request_body = body
+    elseif request_headers["Content-Type"] == lib.CONTENT_TYPE.FORM and type(body) == "table" then
+        request_body = (next(body) ~= nil) and encode_form_table(body) or ""
     else --default and JSON
         if body then
             if next(body) ~= nil then
