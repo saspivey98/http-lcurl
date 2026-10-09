@@ -329,8 +329,9 @@ local function request(method, t)
 
     --make the request
     local ok, err = easy:perform()
-    if not(ok) then
-        return "Error: "..err
+    if not (ok) then
+        easy:close()
+        return "Error: "..err:msg()
     end
     local code = easy:getinfo_response_code()
     local effective_url = easy:getinfo_effective_url()
